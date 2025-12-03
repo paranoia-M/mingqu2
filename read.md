@@ -4,3 +4,4 @@ pip3 install -r requirements.txt
 python3 main.py
 git tag v1.0
 git push origin v1.0
+

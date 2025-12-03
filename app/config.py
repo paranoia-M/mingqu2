@@ -11,7 +11,7 @@ class Colors:
     BORDER = "#333333"
 
 class AppConfig:
-    WINDOW_TITLE = "3D 数字孪生渠道监测控制台"
+    WINDOW_TITLE = "明渠非均匀流流量监测系统"
     WINDOW_WIDTH = 1600
     WINDOW_HEIGHT = 900
     USE_MOCK_CAMERA = False # 如果没有摄像头改为 True

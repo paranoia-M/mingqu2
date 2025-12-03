@@ -14,6 +14,7 @@ class DatabaseManager:
 
     def create_tables(self):
         conn = self.get_connection()
+        
         # 1. 监控日志表
         conn.execute("""
         CREATE TABLE IF NOT EXISTS monitor_logs (
@@ -28,9 +29,9 @@ class DatabaseManager:
         CREATE TABLE IF NOT EXISTS alerts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp DATETIME,
-            level TEXT,    -- RED, YELLOW
+            level TEXT,
             message TEXT,
-            status TEXT    -- UNREAD, RESOLVED
+            status TEXT
         )""")
 
         # 3. 用户表
@@ -38,18 +39,21 @@ class DatabaseManager:
         CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY,
             password TEXT,
-            role TEXT
+            role TEXT,
+            created_at DATETIME
         )""")
         
-        # 插入默认管理员 (生产环境请务必使用哈希加密密码)
+        # 插入默认管理员
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM users WHERE username='admin'")
         if not cursor.fetchone():
-            cursor.execute("INSERT INTO users VALUES ('admin', '123456', 'admin')")
+            cursor.execute("INSERT INTO users VALUES ('admin', '123456', 'admin', ?)", 
+                           (datetime.datetime.now(),))
         
         conn.commit()
         conn.close()
 
+    # --- 数据记录相关 ---
     def insert_record(self, data: dict):
         conn = self.get_connection()
         conn.execute(
@@ -60,13 +64,6 @@ class DatabaseManager:
         conn.commit()
         conn.close()
 
-    def add_alert(self, level, message):
-        conn = self.get_connection()
-        conn.execute("INSERT INTO alerts (timestamp, level, message, status) VALUES (?, ?, ?, ?)",
-                     (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), level, message, "UNREAD"))
-        conn.commit()
-        conn.close()
-
     def get_history(self, limit=100):
         conn = self.get_connection()
         cursor = conn.execute("SELECT * FROM monitor_logs ORDER BY id DESC LIMIT ?", (limit,))
@@ -74,6 +71,18 @@ class DatabaseManager:
         conn.close()
         return rows
 
+    def export_to_csv(self, filename="export_data.csv"):
+        conn = self.get_connection()
+        cursor = conn.execute("SELECT * FROM monitor_logs")
+        import csv
+        with open(filename, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow([i[0] for i in cursor.description])
+            writer.writerows(cursor)
+        conn.close()
+        return os.path.abspath(filename)
+
+    # --- 用户认证与注册相关 ---
     def authenticate(self, username, password):
         conn = self.get_connection()
         cursor = conn.execute("SELECT role FROM users WHERE username=? AND password=?", (username, password))
@@ -81,12 +90,24 @@ class DatabaseManager:
         conn.close()
         return result[0] if result else None
 
-    def export_to_csv(self, filename="export_data.csv"):
+    def user_exists(self, username):
         conn = self.get_connection()
-        cursor = conn.execute("SELECT * FROM monitor_logs")
-        with open(filename, 'w', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
-            writer.writerow([i[0] for i in cursor.description]) # 写入表头
-            writer.writerows(cursor)
+        cursor = conn.execute("SELECT 1 FROM users WHERE username=?", (username,))
+        result = cursor.fetchone()
         conn.close()
-        return os.path.abspath(filename)
+        return result is not None
+
+    def register_user(self, username, password):
+        """注册新用户，返回 (Success, Message)"""
+        if self.user_exists(username):
+            return False, "用户名已存在"
+        
+        try:
+            conn = self.get_connection()
+            conn.execute("INSERT INTO users (username, password, role, created_at) VALUES (?, ?, ?, ?)",
+                         (username, password, 'user', datetime.datetime.now()))
+            conn.commit()
+            conn.close()
+            return True, "注册成功"
+        except Exception as e:
+            return False, f"数据库错误: {str(e)}"
