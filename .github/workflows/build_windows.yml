@@ -1,6 +1,5 @@
 name: Build Windows Exe
 
-# 触发条件：当你推送类似 'v1.0', 'v2.1' 这样的 tag 时触发
 on:
   push:
     tags:
@@ -8,14 +7,14 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest  # 使用 GitHub 的 Windows 服务器
+    runs-on: windows-latest
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4  # 👈 升级到 v4
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5  # 👈 升级到 v5
       with:
         python-version: '3.10' 
 
@@ -34,7 +33,8 @@ jobs:
         pyinstaller --noconsole --onefile --name="SmartCanalMonitor" --add-data "assets;assets" main.py
 
     - name: Upload Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4  # 👈 这里必须升级到 v4，解决了你的报错
       with:
         name: SmartCanalMonitor-Windows
         path: dist/SmartCanalMonitor.exe
+        # v4 版本默认会自动压缩，所以你下载到的会是一个 zip 包
